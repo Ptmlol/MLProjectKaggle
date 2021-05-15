@@ -19,3 +19,9 @@ def load_data(file_name, exist_label=False):
     if exist_label is False:
         return images
     return images, labels
+
+
+train_img, train_label = load_data('train.txt', exist_label=True)
+valid_img, valid_label = load_data('validation.txt', exist_label=True)
+test_img = load_data('test.txt')
+

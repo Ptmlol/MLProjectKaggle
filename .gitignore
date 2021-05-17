@@ -3,3 +3,6 @@
 .submission.csv
 .test.csv
 .test.py
+test.py
+*.csv
+lab8_partial.py

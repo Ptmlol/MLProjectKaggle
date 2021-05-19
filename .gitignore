@@ -12,3 +12,8 @@ custom.py
 .sample_submission.txt
 .test_gpu.py
 .Working_CT_CNN.py
+better_ct_cnn.py
+CNN_CTSCAN.py
+ctscan_CNN.py
+test_gpu.py
+Working_CT_CNN.py

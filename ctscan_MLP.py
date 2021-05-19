@@ -5,6 +5,7 @@ from PIL import Image
 from sklearn.neural_network import MLPClassifier
 from sklearn import preprocessing
 from sklearn.linear_model import SGDClassifier
+from tensorflow.keras import layers, models
 
 # WEAK < 0.34 acc online, 0.49 brut
 

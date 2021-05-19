@@ -3,16 +3,19 @@ import os
 import pandas as pd
 import tensorflow as tf
 import cv2
-from tensorflow.keras import datasets, layers, models, regularizers
+from tensorflow.keras import layers, models
 import matplotlib.pyplot as plt
-from tensorflow import keras
 from tensorflow.keras.preprocessing.image import ImageDataGenerator
+from keras import backend
+from tensorflow.keras.applications.vgg16 import VGG16
+from tensorflow.keras.applications.densenet import DenseNet121
+
 
 classes = ["native", "arterial", "venous"]
 
 
 class MyModel:
-    def __init__(self, img_size=(50, 50), epochs=5, batch=32, learning_r=0.01, rgb_channel=3, optimizer='adam', loss='sparse_categorical_crossentropy', metrics='accuracy', class_dim=len(classes)):
+    def __init__(self, img_size=(50, 50), epochs=15, batch=36, learning_r=0.01, rgb_channel=3, optimizer='adam', loss='sparse_categorical_crossentropy', metrics='accuracy', class_dim=len(classes)):
         self.img_size = img_size
         self.epochs = epochs
         self.batch_size = batch
@@ -22,7 +25,7 @@ class MyModel:
         self.input_shape = self.convert_input_shape(rgb_channel)
         self.gray = 1 if rgb_channel == 1 else False
         self.progress = None
-        self.data_gen = None
+        self.datagen = None
         self.opti = optimizer
         self.loss = loss
         self.metrics = metrics
@@ -40,7 +43,7 @@ class MyModel:
             for line in f_lines:
                 composed = line.split(',')
                 file_path = os.path.join(dir_name, composed[0])
-                image = cv2.imread(file_path, cv2.IMREAD_GRAYSCALE)
+                image = cv2.imread(file_path)
                 images.append(cv2.resize(image, self.img_size))
                 if exist_label:
                     labels.append(int(composed[1]))
@@ -76,47 +79,41 @@ class MyModel:
         self.valid_img = self.valid_img / 255
         # self.train_label = tf.keras.utils.to_categorical(self.train_label, self.class_dim)
         # self.valid_label = tf.keras.utils.to_categorical(self.valid_label, self.class_dim)
-
-    def data_augment(self):
-        self.data_gen = ImageDataGenerator(
-            rotation_range=10,
-            width_shift_range=[-30, 30],
-            height_shift_range=0.1,
-            brightness_range=[0.2, 1.0],
-            zoom_range=[0.5, 1.0],
-            horizontal_flip=True
+        self.datagen = ImageDataGenerator(
+            featurewise_center=True,
+            featurewise_std_normalization=True,
+            rotation_range=20,
+            width_shift_range=0.2,
+            height_shift_range=0.2,
+            horizontal_flip=True,
+            validation_split=0.2
         )
-        self.data_gen.fit(self.train_img)
+        self.datagen.fit(self.train_img)
+
+    def pre_train_wh_fine_tuning(self):
+        base = DenseNet121(input_shape=self.input_shape, weights='imagenet', include_top=False)
+        for layer in base.layers[:3]:
+            layer.trainable = False
+        for layer in base.layers[-3:]:
+            layer.trainable = True
+        return base
 
     def build_model_architecture(self):
-        self.model = models.Sequential([
-                # layers.Conv2D(filters=32, kernel_size=(3, 3), activation='relu', input_shape=self.input_shape),
-                # layers.Conv2D(filters=32, kernel_size=(3, 3), activation='relu'),#21
-                # layers.MaxPooling2D((2, 2)),
-                # # layers.Dropout(0.25),
-                # # layers.Conv2D(filters=32, kernel_size=(2, 2), padding='same', activation='relu'),#14
-                # # # # layers.MaxPooling2D((3, 3)),
-                # # layers.Conv2D(filters=16, kernel_size=(3, 3), activation='relu'),#10
-                # # layers.MaxPooling2D((2, 2)),
-                # # layers.Conv2D(filters=64, kernel_size=(2, 2), activation='relu'),#5
-                # # layers.MaxPooling2D((2, 2)),
-                # # layers.BatchNormalization(),
-                layers.Conv2D(filters=16, kernel_size=(3, 3), input_shape=self.input_shape),
-                layers.MaxPooling2D((2, 2)),  # 59
-                layers.Conv2D(filters=32, kernel_size=(2, 2), activation='relu'),
-                layers.MaxPooling2D((2, 2)),
-                layers.Dropout(0.5),
-                layers.Conv2D(filters=64, kernel_size=(2, 2), activation='relu'),
-                layers.MaxPooling2D((3, 3)),
-                layers.Conv2D(filters=64, kernel_size=(3, 3), activation='relu'),  # 6
-                layers.MaxPooling2D((2, 2)),
-                layers.Conv2D(filters=32, kernel_size=(2, 2), activation='relu'),  # 2
-                layers.BatchNormalization(),
-                layers.Flatten(),
-                layers.Dense(128, activation='relu'),
-                layers.Dropout(0.5),
-                layers.Dense(self.class_dim, activation='softmax')
-        ])
+        base = self.pre_train_wh_fine_tuning()
+        self.model = models.Sequential()
+        # self.model.add(layers.Lambda(lambda x: backend.resize_images(x, height_factor=4, width_factor=4, data_format='channels_last')))
+        self.model.add(base)
+        self.model.add(layers.BatchNormalization())
+        self.model.add(layers.Flatten())
+        self.model.add(layers.Dense(256, activation='relu'))
+        self.model.add(layers.Dropout(0.25))
+        self.model.add(layers.BatchNormalization())
+        self.model.add(layers.Dense(128, activation='relu'))
+        self.model.add(layers.Dropout(0.2))
+        self.model.add(layers.BatchNormalization())
+        self.model.add(layers.Dense(64, activation='relu'))
+        self.model.add(layers.Dropout(0.1))
+        self.model.add(layers.Dense(3, activation='softmax'))
 
     def show_summary(self):
         try:
@@ -134,8 +131,9 @@ class MyModel:
 
     def fit_model(self):
         try:
-            # self.progress = self.model.fit(self.train_img, self.train_label, epochs=self.epochs, validation_data=(self.valid_img, self.valid_label))
-            self.progress = self.model.fit(self.data_gen.flow(self.train_img, self.train_label, batch_size=32), steps_per_epoch=len(self.train_img) // 32, epochs=self.epochs)
+
+            # self.model.fit(self.train_img, self.train_label, batch_size=self.batch_size, epochs=self.epochs, verbose=1, validation_data=(self.valid_img, self.valid_label))
+            self.progress = self.model.fit(self.datagen.flow(self.train_img, self.train_label, batch_size=32), steps_per_epoch=len(self.train_img) // 32, epochs=self.epochs)
         except Exception as e:
             print(e)
             print("[FIT] Model not yet built!")
@@ -192,18 +190,16 @@ class MyModel:
 
     def run_model(self):
         self.normalize()
-        self.data_augment()
         self.build_model_architecture()
-        self.show_summary()
         self.compile_model()
+        self.show_summary()
         self.fit_model()
         self.evaluate_model()
         # self.plot_img(self.train_img, self.train_label, 1)  # example of img plotted
-        # self.predict_model()
-        # self.load_to_csv()
+        self.load_to_csv()
 
 
-my_model = MyModel(img_size=(100, 100), rgb_channel=1)
+my_model = MyModel(img_size=(32,32))
 # my_model.normalize()
 # my_model.data_augment()
 # my_model.print_arrays()

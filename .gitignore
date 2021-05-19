@@ -6,3 +6,9 @@
 test.py
 *.csv
 lab8_partial.py
+.better_ct_scan.py
+.CNN_CTSCAN.py
+custom.py
+.sample_submission.txt
+.test_gpu.py
+.Working_CT_CNN.py

@@ -87,8 +87,12 @@ class MyModel:
         self.train_img = self.train_img / 255
         self.test_img = self.test_img / 255
         self.valid_img = self.valid_img / 255
+
+        '''DOAR PENTRU CATEGORICAL CROSSENTROPY'''
+
         # self.train_label = tf.keras.utils.to_categorical(self.train_label, self.class_dim)
         # self.valid_label = tf.keras.utils.to_categorical(self.valid_label, self.class_dim)
+
         self.datagen = ImageDataGenerator(
             rotation_range=45,
             horizontal_flip=True,
@@ -124,19 +128,19 @@ class MyModel:
         # self.model.add(layers.Dense(64, activation='relu'))
         # self.model.add(layers.Dense(3, activation='softmax'))
         self.model = models.Sequential()
-        self.model.add(layers.Convolution2D(16, 3, activation='relu', input_shape=self.input_shape))  # adaugam un layer de tip convolution. 16=nr neuroni, activation= functia de activare ( matematica )
+        self.model.add(layers.Convolution2D(16, 3, activation='relu', input_shape=self.input_shape))
 
-        self.model.add(layers.Convolution2D(32, 3, activation='relu'))  # la fel, 32 neuroni
-        self.model.add(layers.MaxPooling2D(pool_size=(2, 2)))  # extragem matrici de 2 pe 2 din convolutii
+        self.model.add(layers.Convolution2D(32, 3, activation='relu'))
+        self.model.add(layers.MaxPooling2D(pool_size=(2, 2)))
 
-        self.model.add(layers.Convolution2D(64, 3, activation='relu'))  # 64 neuroni
+        self.model.add(layers.Convolution2D(64, 3, activation='relu'))
         self.model.add(layers.MaxPooling2D(pool_size=(2, 2)))
 
         self.model.add(layers.Convolution2D(128, 3, activation='relu'))
         self.model.add(layers.MaxPooling2D(pool_size=(2, 2)))
 
         self.model.add(layers.BatchNormalization())
-        self.model.add(layers.Flatten())  # conecteaza straturile intre ele
+        self.model.add(layers.Flatten())
         self.model.add(layers.Dense(256, activation='relu'))
         self.model.add(layers.Dense(64, activation='relu'))
         self.model.add(layers.Dense(3, activation='softmax'))

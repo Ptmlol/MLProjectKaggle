@@ -96,7 +96,6 @@ class MyModel:
         self.datagen = ImageDataGenerator(
             rotation_range=45,
             horizontal_flip=True,
-            batch_size=32
         )
 
         self.datagen.fit(self.train_img)
